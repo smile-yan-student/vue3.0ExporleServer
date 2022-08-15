@@ -5,7 +5,7 @@ const formidable = require("formidable");
 app.use(express.urlencoded());
 app.use(express.json());
 const fs = require("fs");
-
+const { query } = require("./sql.js");
 app.listen(3000, function (err) {
     if (!err) console.log("------服务启动成功------");
     else {
@@ -14,52 +14,61 @@ app.listen(3000, function (err) {
 });
 
 app.get("/application/title", (req, res) => {
-    var connection = mysql.createConnection({
-        host: "localhost",
-        user: "root",
-        password: "12345678",
-        database: "Passenger",
-    });
-
-    connection.query(
-        "SELECT * from sentence",
-        function (error, results, fields) {
-            if (error) throw error;
+    query("SELECT * from sentence")
+        .then((results) => {
             let msg = results[results.length - 1];
             res.send({
                 code: 200,
                 data: msg,
             });
-        }
-    );
+        })
+        .catch(() => {
+            res.send({
+                code: 500,
+            });
+        });
 });
 
 app.get("/application/updatetitle", (req, res) => {
-    console.log(req.query, "------------");
-    let msg;
-    var connection = mysql.createConnection({
-        host: "localhost",
-        user: "root",
-        password: "12345678",
-        database: "Passenger",
-    });
-
-    connection.query(
-        `insert into sentence (title) values ('${req.query.title}')`,
-        function (error, results, fields) {
-            if (error) {
-                res.status = 400;
-                res.send({
-                    code: 500,
-                });
-                throw error;
-            }
+    query(`insert into sentence (title) values ('${req.query.title}')`)
+        .then((results) => {
             res.send({
                 code: 200,
-                data: msg,
+                data: "ok",
             });
-        }
-    );
+        })
+        .catch(() => {
+            res.status = 400;
+            res.send({
+                code: 500,
+            });
+        });
+});
+app.post("/application/login", (req, res) => {
+    let {
+        info: { name, password: pw },
+    } = req.body;
+    query(`SELECT name,password from user where name = "${name}"`)
+        .then((results) => {
+            if (!results.length) {
+                res.status(401);
+                res.send("err");
+                return;
+            }
+            let { password } = results[0];
+            if (pw == password) {
+                res.send({ msg: "ok" });
+                return;
+            } else {
+                res.status(401);
+                res.send("password error");
+                return;
+            }
+        })
+        .catch(() => {
+            res.status(500);
+            res.send("err");
+        });
 });
 
 app.post("/application/uploadScan", (req, res) => {
@@ -72,10 +81,32 @@ app.post("/application/uploadScan", (req, res) => {
         res.send("ok");
     });
 });
-// let a = "";
-// "fontconfig, frei0r, gmp, bdw-gc, libffi, m4, libtool, pkg-config, readline, guile, libtasn1, nettle, p11-kit, c-ares, jemalloc, libev, nghttp2, unbound, gnutls, lame, fribidi, gdbm, mpdecimal, sqlite, xz, python@3.9, glib, libpthread-stubs, xorgproto, libxau, libxdmcp, libxcb, libx11, libxext, libxrender, lzo, pixman, cairo, gobject-introspection, graphite2, harfbuzz, libass, libbluray, libsoxr, libvidstab, libogg, libvorbis, libvpx, opencore-amr, jpeg, libtiff, little-cms2, openjpeg, opus, rav1e, flac, libsndfile, libsamplerate, rubberband, sdl2, snappy, speex, srt, giflib, webp, leptonica, tesseract, theora, x264, x265, xvid, libsodium, zeromq"
-//     .split(",")
-//     .forEach((item) => {
-//         a += item;
-//     });
-// console.log(a, "------------");
+app.post("/application/registry", (req, res) => {
+    let {
+        info: { name, password, timestamp },
+    } = req.body;
+    query(`SELECT name from user where name = "${name}"`)
+        .then((results) => {
+            if (results.length) {
+                res.status(401);
+                res.send("erruser exit");
+                return;
+            } else {
+                query(
+                    `insert into user (name,password)values("${name}","${password}") `
+                )
+                    .then(() => {
+                        res.status(200);
+                        res.send({});
+                    })
+                    .catch(() => {
+                        res.status(500);
+                        res.send({});
+                    });
+            }
+        })
+        .catch(() => {
+            res.status(500);
+            res.send("err");
+        });
+});
