@@ -10,9 +10,5 @@ module.exports = {
         path: resolve("./dist"),
         filename: "index.js",
     },
-    // plugins: [new NodePolyfillPlugin()],
-    // externals: {
-    //     fs: require("fs"),
-    // },
     target: "node",
 };
